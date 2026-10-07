@@ -33,12 +33,22 @@ export function partitionOnboardingProjects<T extends AgentSessionProjectCandida
 export interface OnboardingProjectGroup<T> {
   /** Stable identity for collapse state and React keys. */
   readonly key: string;
-  /** GitHub `owner/name`, or the checkout's folder name when the origin is elsewhere. */
+  /**
+   * GitHub `owner/name`, the remote's path for other hosts, or the checkout's
+   * folder name when there is no remote.
+   */
   readonly label: string;
   readonly repository: string | null;
   readonly candidates: ReadonlyArray<T>;
   readonly threadCount: number;
   readonly lastActiveAt: string | null;
+}
+
+/** `owner/name` from a normalized remote key such as `bitbucket.org/owner/name`. */
+function remoteRepositoryPath(remoteKey: string | null): string | null {
+  if (remoteKey === null) return null;
+  const path = remoteKey.split("/").slice(1).join("/");
+  return path.length > 0 ? path : null;
 }
 
 function latestActivity(left: string | null, right: string | null): string | null {
@@ -75,7 +85,7 @@ export function groupOnboardingProjects<
     if (existing === undefined) {
       groups.set(key, {
         key,
-        label: git.repository ?? candidate.title,
+        label: git.repository ?? remoteRepositoryPath(git.remoteKey) ?? candidate.title,
         repository: git.repository,
         candidates: [candidate],
         threadCount: candidate.threadCount,
