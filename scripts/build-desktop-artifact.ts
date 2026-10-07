@@ -2891,11 +2891,9 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
     const path = yield* Path.Path;
     const repoRoot = yield* RepoRoot;
     buildConfig.linux = {
-      // The .deb is built from the same unpacked app after the AppImage.
-      // electron-builder lists both in latest-linux.yml and writes
-      // resources/package-type into the .deb only, so electron-updater updates
-      // each install in its own format.
-      target: target === "AppImage" ? [target, "deb"] : [target],
+      // Personal build: AppImage only. The .deb step needs electron-builder's
+      // bundled Ruby, which wants libcrypt.so.1 and does not run on Arch.
+      target: [target],
       executableName: "t3code",
       icon: "icons",
       category: "Development",
