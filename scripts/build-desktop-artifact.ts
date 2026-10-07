@@ -2890,7 +2890,9 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
     const path = yield* Path.Path;
     const repoRoot = yield* RepoRoot;
     buildConfig.linux = {
-      target: target === "AppImage" ? [target, "deb"] : [target],
+      // Personal build: AppImage only. The .deb step needs electron-builder's
+      // bundled Ruby, which wants libcrypt.so.1 and does not run on Arch.
+      target: [target],
       executableName: "t3code",
       icon: "icons",
       category: "Development",
