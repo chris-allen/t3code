@@ -252,7 +252,7 @@ it.layer(NodeServices.layer)("RepositoryIdentityResolverLive", (it) => {
   );
 
   it.effect.each(["add", "replace"] as const)(
-    "refreshes the primary upstream after %s before cache expiry",
+    "refreshes the primary remote after %s before cache expiry",
     (change) =>
       Effect.gen(function* () {
         const fileSystem = yield* FileSystem.FileSystem;
@@ -261,9 +261,9 @@ it.layer(NodeServices.layer)("RepositoryIdentityResolverLive", (it) => {
         });
 
         yield* git(cwd, ["init"]);
-        yield* git(cwd, ["remote", "add", "origin", "git@github.com:julius/t3code.git"]);
+        yield* git(cwd, ["remote", "add", "upstream", "git@github.com:julius/t3code.git"]);
         if (change === "replace") {
-          yield* git(cwd, ["remote", "add", "upstream", "git@github.com:T3Tools/previous.git"]);
+          yield* git(cwd, ["remote", "add", "origin", "git@github.com:T3Tools/previous.git"]);
         }
 
         const resolver = yield* RepositoryIdentityResolver.RepositoryIdentityResolver;
@@ -275,21 +275,21 @@ it.layer(NodeServices.layer)("RepositoryIdentityResolverLive", (it) => {
         yield* git(cwd, [
           "remote",
           change === "add" ? "add" : "set-url",
-          "upstream",
+          "origin",
           "git@github.com:T3Tools/t3code.git",
         ]);
         expect(yield* resolver.resolve(cwd)).toEqual(initialIdentity);
         const identity = yield* resolver.resolve(cwd, { refresh: true });
 
         expect(identity).not.toBeNull();
-        expect(identity?.locator.remoteName).toBe("upstream");
+        expect(identity?.locator.remoteName).toBe("origin");
         expect(identity?.canonicalKey).toBe("github.com/t3tools/t3code");
         expect(identity?.displayName).toBe("t3tools/t3code");
         expect(yield* resolver.resolve(cwd)).toEqual(identity);
       }).pipe(Effect.provide(RepositoryIdentityResolver.layer)),
   );
 
-  it.effect("reports a fork's own remote as origin next to the upstream identity", () =>
+  it.effect("keeps a fork's own remote as the identity when an upstream remote exists too", () =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
       const cwd = yield* fileSystem.makeTempDirectoryScoped({
@@ -303,12 +303,9 @@ it.layer(NodeServices.layer)("RepositoryIdentityResolverLive", (it) => {
       const resolver = yield* RepositoryIdentityResolver.RepositoryIdentityResolver;
       const identity = yield* resolver.resolve(cwd);
 
-      expect(identity?.canonicalKey).toBe("github.com/t3tools/t3code");
-      expect(identity?.displayName).toBe("t3tools/t3code");
-      expect(identity?.origin).toEqual({
-        canonicalKey: "github.com/julius/t3code-fork",
-        displayName: "julius/t3code-fork",
-      });
+      expect(identity?.canonicalKey).toBe("github.com/julius/t3code-fork");
+      expect(identity?.displayName).toBe("julius/t3code-fork");
+      expect(identity?.origin).toBeUndefined();
     }).pipe(Effect.provide(RepositoryIdentityResolver.layer)),
   );
 
