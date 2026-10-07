@@ -32,6 +32,13 @@ export interface OnboardingProjectGroup<T> {
   readonly lastActiveAt: string | null;
 }
 
+/** `owner/name` from a normalized remote key such as `bitbucket.org/owner/name`. */
+function remoteRepositoryPath(remoteKey: string | null): string | null {
+  if (remoteKey === null) return null;
+  const path = remoteKey.split("/").slice(1).join("/");
+  return path.length > 0 ? path : null;
+}
+
 function latestActivity(left: string | null, right: string | null): string | null {
   if (left === null) return right;
   if (right === null) return left;
@@ -58,7 +65,7 @@ export function groupOnboardingProjects<
     if (existing === undefined) {
       groups.set(key, {
         key,
-        label: git.repository ?? candidate.title,
+        label: git.repository ?? remoteRepositoryPath(git.remoteKey) ?? candidate.title,
         repository: git.repository,
         candidates: [candidate],
         threadCount: candidate.threadCount,

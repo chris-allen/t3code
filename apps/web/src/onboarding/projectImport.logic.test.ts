@@ -122,6 +122,24 @@ describe("groupOnboardingProjects", () => {
     ]);
   });
 
+  it("labels a non-GitHub repository by its remote path instead of a folder name", () => {
+    const bitbucket = { remoteKey: "bitbucket.org/apaxsoftware/apax-datahub", repository: null };
+    const newest = candidate("/code/apax-datahub/replay", {
+      git: bitbucket,
+      lastActiveAt: "2026-08-21T12:00:00.000Z",
+    });
+    const older = candidate("/code/apax-datahub/main", {
+      git: bitbucket,
+      lastActiveAt: "2026-08-20T12:00:00.000Z",
+    });
+
+    const grouped = groupOnboardingProjects([newest, older]);
+
+    expect(grouped.repositories.map((group) => [group.label, group.repository])).toEqual([
+      ["apaxsoftware/apax-datahub", null],
+    ]);
+  });
+
   // regression: #10547 project import broke on servers that predate git identity
   it("lists candidates without git identity as standalone repositories", () => {
     const { git: _git, ...legacy } = candidate("/code/legacy", { title: "legacy" });
