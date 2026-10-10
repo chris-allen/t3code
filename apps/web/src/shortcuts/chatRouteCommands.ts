@@ -122,6 +122,10 @@ export function installChatRouteCommands(router: AnyRouter): () => void {
         claim(event);
         void scratch.startScratchThread(environmentId);
       },
+      "chat.newWorktreeThreadIn": (event) => {
+        claim(event);
+        openCommandPalette({ open: "new-worktree-thread-in" });
+      },
       "chat.new": (event) => {
         // The boring sidebar's folders already show the context, so it starts in
         // the current project like the legacy sidebar did.
