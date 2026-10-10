@@ -13,6 +13,7 @@ import {
   createCommandPaletteSearchState,
   reduceCommandPaletteSearchState,
   type CommandPaletteUiState,
+  resolveWorktreeBrowseDirectory,
 } from "./CommandPalette.logic";
 
 describe("linked pull request thread navigation", () => {
@@ -916,5 +917,37 @@ describe("returning from file and content search", () => {
     expect(closed).toEqual({ open: false, mode: "files", openIntent: null, session: 0 });
     expect(reduceCommandPaletteUiState(closed, { _tag: "BackToCommand" })).toEqual(closed);
     expect(reduceCommandPaletteUiState(closed, { _tag: "SetOpen", open: true })).toEqual(root);
+  });
+});
+
+describe("resolveWorktreeBrowseDirectory", () => {
+  const env = EnvironmentId.make("env-local");
+  const otherEnv = EnvironmentId.make("env-remote");
+  const at = (environmentId: EnvironmentId, workspaceRoot: string) => ({
+    environmentId,
+    workspaceRoot,
+  });
+
+  it("browses the parent folder from a worktree whose bare root is a project", () => {
+    const current = at(env, "/home/u/git/repo/dev");
+    const projects = [at(env, "/home/u/git/repo"), current];
+    expect(resolveWorktreeBrowseDirectory(current, projects)).toBe("/home/u/git/repo/");
+  });
+
+  it("browses its own folder from a bare root that has worktree projects", () => {
+    const current = at(env, "/home/u/git/repo");
+    const projects = [current, at(env, "/home/u/git/repo/dev"), at(env, "/home/u/git/other")];
+    expect(resolveWorktreeBrowseDirectory(current, projects)).toBe("/home/u/git/repo/");
+  });
+
+  it("falls back to the parent folder without sibling projects", () => {
+    const current = at(env, "/home/u/git/repo/dev");
+    expect(resolveWorktreeBrowseDirectory(current, [current])).toBe("/home/u/git/repo/");
+  });
+
+  it("ignores projects on other environments", () => {
+    const current = at(env, "/home/u/git/repo");
+    const projects = [current, at(otherEnv, "/home/u/git/repo/dev")];
+    expect(resolveWorktreeBrowseDirectory(current, projects)).toBe("/home/u/git/");
   });
 });

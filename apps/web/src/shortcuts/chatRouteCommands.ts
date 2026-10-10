@@ -117,6 +117,10 @@ export function installChatRouteCommands(router: AnyRouter): () => void {
         claim(event);
         void scratch.startScratchThread(environmentId);
       },
+      "chat.newWorktreeThreadIn": (event) => {
+        claim(event);
+        openCommandPalette({ open: "new-worktree-thread-in" });
+      },
       "chat.new": (event) => {
         // Pre-hydration settings are the defaults, where the legacy sidebar is off.
         if (!getClientSettings().legacySidebarEnabled && readProjectGroupCount() > 1) {

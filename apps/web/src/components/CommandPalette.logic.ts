@@ -29,6 +29,11 @@ import {
 } from "@t3tools/contracts";
 import { filterFilesystemBrowseEntries } from "@t3tools/client-runtime/state/filesystem";
 import { type ReactNode } from "react";
+import {
+  ensureBrowseDirectoryPath,
+  getBrowseParentPath,
+  normalizeProjectPathForComparison,
+} from "@t3tools/client-runtime/state/projects";
 import { formatRelativeTimeLabel } from "../timestampFormat";
 import { type Project, type SidebarThreadSummary, type Thread } from "../types";
 import { isSidebarSubagentThread } from "./Sidebar.logic";
@@ -71,7 +76,7 @@ export function browseInputEndPaddingClass(input: {
 export type SearchOverlayMode = "command" | "files" | "content";
 
 export type CommandPaletteOpenIntent =
-  | { readonly kind: "add-project" | "new-thread-in" | "change-theme" }
+  | { readonly kind: "add-project" | "new-thread-in" | "new-worktree-thread-in" | "change-theme" }
   | {
       readonly kind: "search";
       readonly query: string;
@@ -99,6 +104,7 @@ export type CommandPaletteUiAction =
     }
   | { readonly _tag: "OpenAddProject" }
   | { readonly _tag: "OpenNewThreadIn" }
+  | { readonly _tag: "OpenNewWorktreeThreadIn" }
   | { readonly _tag: "OpenChangeTheme" }
   | {
       readonly _tag: "OpenChildSearch";
@@ -155,6 +161,8 @@ export function reduceCommandPaletteUiState(
       return openWithIntent({ kind: "add-project" });
     case "OpenNewThreadIn":
       return openWithIntent({ kind: "new-thread-in" });
+    case "OpenNewWorktreeThreadIn":
+      return openWithIntent({ kind: "new-worktree-thread-in" });
     case "OpenChangeTheme":
       return openWithIntent({ kind: "change-theme" });
   }
@@ -859,4 +867,27 @@ export function overlayModeForCommand(command: string | null): SearchOverlayMode
   return command in OVERLAY_MODE_BY_COMMAND
     ? OVERLAY_MODE_BY_COMMAND[command as keyof typeof OVERLAY_MODE_BY_COMMAND]
     : null;
+}
+
+// Worktrees sit beside a bare `.git`: a bare root browses its own folder, a worktree its parent.
+// Sibling projects decide which; with none, a worktree is the likelier guess.
+export function resolveWorktreeBrowseDirectory(
+  current: Pick<Project, "environmentId" | "workspaceRoot">,
+  projects: ReadonlyArray<Pick<Project, "environmentId" | "workspaceRoot">>,
+): string {
+  const ownDirectory = ensureBrowseDirectoryPath(current.workspaceRoot);
+  const parentDirectory = getBrowseParentPath(current.workspaceRoot) ?? ownDirectory;
+  const ownKey = normalizeProjectPathForComparison(current.workspaceRoot);
+  const parentKey = normalizeProjectPathForComparison(parentDirectory);
+  for (const project of projects) {
+    if (project.environmentId !== current.environmentId) continue;
+    const key = normalizeProjectPathForComparison(project.workspaceRoot);
+    if (key === ownKey) continue;
+    if (key === parentKey) return parentDirectory;
+    const projectParent = getBrowseParentPath(project.workspaceRoot);
+    if (projectParent !== null && normalizeProjectPathForComparison(projectParent) === ownKey) {
+      return ownDirectory;
+    }
+  }
+  return parentDirectory;
 }
