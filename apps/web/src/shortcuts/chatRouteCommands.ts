@@ -122,6 +122,10 @@ export function installChatRouteCommands(router: AnyRouter): () => void {
         claim(event);
         void scratch.startScratchThread(environmentId);
       },
+      "chat.newWorktreeThreadIn": (event) => {
+        claim(event);
+        openCommandPalette({ open: "new-worktree-thread-in" });
+      },
       "chat.new": (event) => {
         const { legacySidebarEnabled } = getClientSettings();
         const groups = readProjectGroups();
