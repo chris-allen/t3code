@@ -194,6 +194,7 @@ import {
   RECENT_THREAD_LIMIT,
   reduceCommandPaletteUiState,
   type SearchOverlayMode,
+  resolveWorktreeBrowseDirectory,
 } from "./CommandPalette.logic";
 import { orderItemsByPreferredIds, sortLogicalProjectsForSidebar } from "./Sidebar.logic";
 import { resolveEnvironmentOptionLabel } from "./BranchToolbar.logic";
@@ -385,6 +386,10 @@ export function CommandPalette({ children }: { children: ReactNode }) {
   );
   const openAddProject = useCallback(() => dispatch({ _tag: "OpenAddProject" }), []);
   const openNewThreadIn = useCallback(() => dispatch({ _tag: "OpenNewThreadIn" }), []);
+  const openNewWorktreeThreadIn = useCallback(
+    () => dispatch({ _tag: "OpenNewWorktreeThreadIn" }),
+    [],
+  );
   const clearOpenIntent = useCallback(() => dispatch({ _tag: "ClearOpenIntent" }), []);
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const { theme, themeHalves, resolvedTheme, appearanceMode, setAppearanceMode } = useTheme();
@@ -501,6 +506,8 @@ export function CommandPalette({ children }: { children: ReactNode }) {
       onOpenCommandPalette((detail) => {
         if (detail.open === "new-thread-in") {
           openNewThreadIn();
+        } else if (detail.open === "new-worktree-thread-in") {
+          openNewWorktreeThreadIn();
         } else if (detail.open === "add-project") {
           openAddProject();
         } else if (detail.query !== undefined) {
@@ -513,7 +520,7 @@ export function CommandPalette({ children }: { children: ReactNode }) {
           setOpen(true);
         }
       }),
-    [openAddProject, openNewThreadIn, setOpen],
+    [openAddProject, openNewThreadIn, openNewWorktreeThreadIn, setOpen],
   );
 
   return (
@@ -1465,8 +1472,9 @@ function OpenCommandPaletteDialog(props: {
   }
 
   const startAddProjectBrowse = useCallback(
-    async (environmentId: EnvironmentId): Promise<void> => {
-      const initialQuery = getAddProjectInitialQueryForEnvironment(environmentId);
+    async (environmentId: EnvironmentId, initialDirectory?: string): Promise<void> => {
+      const initialQuery =
+        initialDirectory ?? getAddProjectInitialQueryForEnvironment(environmentId);
       const initialBrowsePath = getBrowseDirectoryPath(initialQuery);
       const browseCwd = getBrowseCwdForEnvironment(environmentId);
       const view: CommandPaletteView = {
@@ -1803,6 +1811,34 @@ function OpenCommandPaletteDialog(props: {
     });
   }, [clearOpenIntent, browseNavigation, openIntent, projectThreadItems, pushPaletteView]);
 
+  const currentProject =
+    currentProjectEnvironmentId && currentProjectId
+      ? (projectByKey.get(`${currentProjectEnvironmentId}:${currentProjectId}`) ?? null)
+      : null;
+  const worktreeBrowseDirectory = currentProject
+    ? resolveWorktreeBrowseDirectory(currentProject, projects)
+    : null;
+  const openWorktreeThreadBrowse = useCallback(() => {
+    if (!currentProject || worktreeBrowseDirectory === null) return;
+    browseNavigation.invalidate();
+    setAddProjectCloneFlow(null);
+    setNewProjectFlow(null);
+    setViewStack([]);
+    void startAddProjectBrowse(currentProject.environmentId, worktreeBrowseDirectory);
+  }, [browseNavigation, currentProject, startAddProjectBrowse, worktreeBrowseDirectory]);
+
+  useLayoutEffect(() => {
+    if (openIntent?.kind !== "new-worktree-thread-in") {
+      return;
+    }
+    clearOpenIntent();
+    if (worktreeBrowseDirectory === null) {
+      setOpen(false);
+      return;
+    }
+    openWorktreeThreadBrowse();
+  }, [clearOpenIntent, openIntent, openWorktreeThreadBrowse, setOpen, worktreeBrowseDirectory]);
+
   const actionItems: Array<CommandPaletteActionItem | CommandPaletteSubmenuItem> = [];
 
   if (projects.length > 0) {
@@ -1829,6 +1865,22 @@ function OpenCommandPaletteDialog(props: {
             defaultProjectRef,
             handleNewThread,
           });
+        },
+      });
+    }
+
+    if (worktreeBrowseDirectory !== null) {
+      actionItems.push({
+        kind: "action",
+        value: "action:new-worktree-thread-in",
+        searchTerms: ["new thread", "worktree", "sibling", "bare", "checkout", "folder"],
+        title: "New worktree thread in...",
+        description: worktreeBrowseDirectory,
+        icon: <FolderPlusIcon className={ITEM_ICON_CLASS} />,
+        shortcutCommand: "chat.newWorktreeThreadIn",
+        keepOpen: true,
+        run: async () => {
+          openWorktreeThreadBrowse();
         },
       });
     }

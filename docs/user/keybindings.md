@@ -154,7 +154,10 @@ through the pages you have visited, like a browser's back and forward buttons.
 `chat.new` may ask you to choose a project when there is more than one.
 `chat.newLocal` skips that chooser. Both use your
 [new-thread defaults](./thread-sidebar.md#start-a-thread). `chat.newWithoutProject`
-(`mod+alt+n`) starts a thread [without a project](./thread-sidebar.md#start-without-a-project).
+(`mod+alt+shift+n`) starts a thread [without a project](./thread-sidebar.md#start-without-a-project).
+`chat.newWorktreeThreadIn` (`mod+alt+n`) opens the folder browser beside the
+current project's worktrees, so you can start a thread in a sibling worktree of
+a bare repository, adding it as a project if needed.
 
 ## Reserved shortcuts
 

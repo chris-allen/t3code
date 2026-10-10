@@ -16,6 +16,7 @@ import {
   reduceCommandPaletteUiState,
   type CommandPaletteActionItem,
   type CommandPaletteGroup,
+  resolveWorktreeBrowseDirectory,
 } from "./CommandPalette.logic";
 
 describe("linked pull request thread navigation", () => {
@@ -253,6 +254,11 @@ describe("reduceCommandPaletteUiState", () => {
       open: true,
       mode: "command",
       openIntent: { kind: "new-thread-in" },
+    });
+    expect(reduceCommandPaletteUiState(filesOpen, { _tag: "OpenNewWorktreeThreadIn" })).toEqual({
+      open: true,
+      mode: "command",
+      openIntent: { kind: "new-worktree-thread-in" },
     });
   });
 
@@ -892,5 +898,37 @@ describe("virtualized command palette rows", () => {
     expect(findHighlightedCommandPaletteItem(groups, "thread-b")?.value).toBe("thread-b");
     expect(findHighlightedCommandPaletteItem(groups, "offline")).toBeNull();
     expect(findHighlightedCommandPaletteItem(groups, null)).toBeNull();
+  });
+});
+
+describe("resolveWorktreeBrowseDirectory", () => {
+  const env = EnvironmentId.make("env-local");
+  const otherEnv = EnvironmentId.make("env-remote");
+  const at = (environmentId: EnvironmentId, workspaceRoot: string) => ({
+    environmentId,
+    workspaceRoot,
+  });
+
+  it("browses the parent folder from a worktree whose bare root is a project", () => {
+    const current = at(env, "/home/u/git/repo/dev");
+    const projects = [at(env, "/home/u/git/repo"), current];
+    expect(resolveWorktreeBrowseDirectory(current, projects)).toBe("/home/u/git/repo/");
+  });
+
+  it("browses its own folder from a bare root that has worktree projects", () => {
+    const current = at(env, "/home/u/git/repo");
+    const projects = [current, at(env, "/home/u/git/repo/dev"), at(env, "/home/u/git/other")];
+    expect(resolveWorktreeBrowseDirectory(current, projects)).toBe("/home/u/git/repo/");
+  });
+
+  it("falls back to the parent folder without sibling projects", () => {
+    const current = at(env, "/home/u/git/repo/dev");
+    expect(resolveWorktreeBrowseDirectory(current, [current])).toBe("/home/u/git/repo/");
+  });
+
+  it("ignores projects on other environments", () => {
+    const current = at(env, "/home/u/git/repo");
+    const projects = [current, at(otherEnv, "/home/u/git/repo/dev")];
+    expect(resolveWorktreeBrowseDirectory(current, projects)).toBe("/home/u/git/");
   });
 });

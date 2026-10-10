@@ -11,6 +11,11 @@ import type { SidebarThreadSortOrder } from "@t3tools/contracts/settings";
 import * as Arr from "effect/Array";
 import * as Result from "effect/Result";
 import { type ReactNode } from "react";
+import {
+  ensureBrowseDirectoryPath,
+  getBrowseParentPath,
+  normalizeProjectPathForComparison,
+} from "../lib/projectPaths";
 import { getThreadSortTimestamp, sortThreads } from "../lib/threadSort";
 import { normalizeSearchText } from "../lib/utils";
 import { formatRelativeTimeLabel } from "../timestampFormat";
@@ -61,7 +66,7 @@ export function browseInputEndPaddingClass(input: {
 export type SearchOverlayMode = "command" | "files" | "content";
 
 export type CommandPaletteOpenIntent =
-  | { readonly kind: "add-project" | "new-thread-in" | "change-theme" }
+  | { readonly kind: "add-project" | "new-thread-in" | "new-worktree-thread-in" | "change-theme" }
   | {
       readonly kind: "search";
       readonly query: string;
@@ -84,6 +89,7 @@ export type CommandPaletteUiAction =
     }
   | { readonly _tag: "OpenAddProject" }
   | { readonly _tag: "OpenNewThreadIn" }
+  | { readonly _tag: "OpenNewWorktreeThreadIn" }
   | { readonly _tag: "OpenChangeTheme" }
   | { readonly _tag: "ClearOpenIntent" };
 
@@ -114,6 +120,8 @@ export function reduceCommandPaletteUiState(
       return { open: true, mode: "command", openIntent: { kind: "add-project" } };
     case "OpenNewThreadIn":
       return { open: true, mode: "command", openIntent: { kind: "new-thread-in" } };
+    case "OpenNewWorktreeThreadIn":
+      return { open: true, mode: "command", openIntent: { kind: "new-worktree-thread-in" } };
     case "OpenChangeTheme":
       return { open: true, mode: "command", openIntent: { kind: "change-theme" } };
     case "ClearOpenIntent":
@@ -620,4 +628,32 @@ export function getCommandPaletteInputPlaceholder(mode: CommandPaletteMode): str
     case "submenu-browse":
       return "Enter path (e.g. ~/projects/my-app)";
   }
+}
+
+/**
+ * Folder to browse for sibling worktrees of a project in a bare repository
+ * layout, where worktrees sit beside a bare `.git`. A project that is itself
+ * the bare root browses its own folder; a worktree browses its parent. Other
+ * projects on the same environment decide which case applies; with none, the
+ * parent is the better guess because most threads run in a worktree.
+ */
+export function resolveWorktreeBrowseDirectory(
+  current: Pick<Project, "environmentId" | "workspaceRoot">,
+  projects: ReadonlyArray<Pick<Project, "environmentId" | "workspaceRoot">>,
+): string {
+  const ownDirectory = ensureBrowseDirectoryPath(current.workspaceRoot);
+  const parentDirectory = getBrowseParentPath(current.workspaceRoot) ?? ownDirectory;
+  const ownKey = normalizeProjectPathForComparison(current.workspaceRoot);
+  const parentKey = normalizeProjectPathForComparison(parentDirectory);
+  for (const project of projects) {
+    if (project.environmentId !== current.environmentId) continue;
+    const key = normalizeProjectPathForComparison(project.workspaceRoot);
+    if (key === ownKey) continue;
+    if (key === parentKey) return parentDirectory;
+    const projectParent = getBrowseParentPath(project.workspaceRoot);
+    if (projectParent !== null && normalizeProjectPathForComparison(projectParent) === ownKey) {
+      return ownDirectory;
+    }
+  }
+  return parentDirectory;
 }

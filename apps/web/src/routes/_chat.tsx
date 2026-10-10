@@ -114,6 +114,13 @@ function ChatRouteGlobalShortcuts() {
         return;
       }
 
+      if (command === "chat.newWorktreeThreadIn") {
+        event.preventDefault();
+        event.stopPropagation();
+        openCommandPalette({ open: "new-worktree-thread-in" });
+        return;
+      }
+
       if (command === "chat.newWithoutProject") {
         const environmentId = scratchEnvironmentId(
           activeThread?.environmentId ?? activeDraftThread?.environmentId ?? primaryEnvironmentId,
