@@ -491,9 +491,13 @@ it.effect("withMemory keeps the last identity for a root whose folder is gone", 
     yield* Ref.set(folderExists, true);
     expect(yield* resolver.resolve(workspaceRoot)).toBeNull();
 
-    // A root that never resolved has nothing to fall back on.
+    // A root deleted before it was ever remembered inherits from a remembered ancestor,
+    // and one outside any remembered root has nothing to fall back on.
     yield* Ref.set(folderExists, false);
-    expect(yield* resolver.resolve("/repo/never-seen")).toBeNull();
+    expect(yield* resolver.resolve("/repo/feature/packages/web")).toEqual(
+      rememberedIdentity(workspaceRoot),
+    );
+    expect(yield* resolver.resolve("/elsewhere/never-seen")).toBeNull();
   }).pipe(
     Effect.provide(
       Layer.merge(
