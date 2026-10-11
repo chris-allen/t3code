@@ -278,18 +278,24 @@ export const make = Effect.fn("RepositoryIdentityResolver.make")(function* (
 });
 
 /**
- * Decorates a resolver with RepositoryIdentityMemory. Git has nothing to read in a deleted
- * folder, so a removed worktree would resolve to no repository and fall out of its group. The
- * identity the root last resolved to still names the repository, so that is the answer while the
- * folder is gone. A folder that exists and resolves to null really has no repository, and memory
- * stays out of it; so does one whose existence check fails, since an unreadable folder is not a
- * deleted one.
+ * A deleted folder falls back to the identity it, or its nearest remembered ancestor, last resolved
+ * to, so a removed worktree stays in its repository group. A folder that exists, or whose existence
+ * check fails, never uses memory: its null is real.
  */
 export const withMemory = Effect.fn("RepositoryIdentityResolver.withMemory")(function* (
   resolver: RepositoryIdentityResolver["Service"],
 ) {
   const memory = yield* RepositoryIdentityMemory.RepositoryIdentityMemory;
   const fileSystem = yield* FileSystem.FileSystem;
+  const recallNearest = Effect.fnUntraced(function* (cwd: string) {
+    for (let candidate = cwd; ;) {
+      const remembered = yield* memory.recall(candidate);
+      if (Option.isSome(remembered)) return remembered.value;
+      const parent = parentDirectory(candidate);
+      if (parent === null) return null;
+      candidate = parent;
+    }
+  });
   const resolve: RepositoryIdentityResolver["Service"]["resolve"] = Effect.fnUntraced(
     function* (cwd, options) {
       const identity = yield* resolver.resolve(cwd, options);
@@ -299,11 +305,19 @@ export const withMemory = Effect.fn("RepositoryIdentityResolver.withMemory")(fun
       }
       const exists = yield* fileSystem.exists(cwd).pipe(Effect.orElseSucceed(() => true));
       if (exists) return null;
-      return Option.getOrNull(yield* memory.recall(cwd));
+      return yield* recallNearest(cwd);
     },
   );
   return RepositoryIdentityResolver.of({ resolve });
 });
+
+function parentDirectory(path: string): string | null {
+  const trimmed = path.replace(/[\\/]+$/, "");
+  const index = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"));
+  if (index <= 0) return null;
+  const parent = trimmed.slice(0, index);
+  return /^[a-zA-Z]:$/.test(parent) ? null : parent;
+}
 
 export const layer = Layer.effect(RepositoryIdentityResolver, make()).pipe(
   Layer.provide(ProcessRunner.layer),
