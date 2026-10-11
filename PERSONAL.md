@@ -51,6 +51,58 @@ sides are the same stable version.
 The installed app may offer an update to the stable version this branch is
 based on. Decline it; that build has none of these commits.
 
+## Server build for capella
+
+Capella runs the headless server as a systemd user service from a pinned
+runtime at `~/.t3/runtime/versions/<version>/`. That runtime is the CLI
+archive (`scripts/build-cli-archive.ts`), not the AppImage. Build it here and
+copy it over. The single-executable step needs Node 25.7 or newer as the host,
+so it runs with a standalone Node 26 unpacked under `/tmp`; everything else
+builds with the system Node 24. The resource monitor is reused from capella's
+installed stable runtime instead of being compiled.
+
+```sh
+cd ~/git/t3code/personal
+export PATH="$PWD/node_modules/.bin:$PATH"
+mkdir -p /tmp/node26 && curl -fsSL https://nodejs.org/dist/v26.8.2/node-v26.8.2-linux-x64.tar.xz \
+  | tar -xJ --strip-components=1 -C /tmp/node26
+scp -r capella:.t3/runtime/versions/0.0.45/resource-monitor /tmp/resource-monitor
+vp run --filter t3 build
+PATH="/tmp/node26/bin:$PATH" node apps/server/scripts/cli.ts build-exe
+node scripts/build-cli-archive.ts --platform linux --arch x64 --version 0.0.44 \
+  --output-dir release --resource-monitor-dir /tmp/resource-monitor
+scp release/t3-0.0.44-linux-x64.tar.gz capella:git/t3code/personal/release/
+```
+
+The version in the archive name is the repo's `package.json` version, which
+trails the release tag by one because release CI bumps it. The executable
+reports the same number, and the service installer expects the runtime at the
+directory named after it.
+
+On capella, unpack it there and let the CLI rewrite the unit. The install
+stops, reloads, and restarts the service itself, which interrupts running
+turns and remote clients, so nothing needs stopping first.
+
+```sh
+cd ~/.t3/runtime/versions
+rm -rf 0.0.44 && mkdir 0.0.44
+tar -xzf ~/git/t3code/personal/release/t3-0.0.44-linux-x64.tar.gz \
+  --strip-components=1 -C 0.0.44
+printf '0.0.44\n' > 0.0.44/.install-complete
+0.0.44/t3 service install --allow-downgrade
+ln -sfn ~/.t3/runtime/versions/0.0.44/t3 ~/.local/bin/t3
+```
+
+`--allow-downgrade` is needed because `0.0.44` sorts below the installed stable
+`0.0.45`. Do not run `t3 update` on capella; it would replace this build with
+the stock stable one.
+
+Capella can also build the archive itself: its Node 26 covers every step, and
+`~/git/t3code/personal/release/build.sh` there runs the whole sequence with
+`npx pnpm@11.10.0`. The web bundle's Babel code-splitting step failed once
+there and passed on retry, so rerun it if it dies with a `trailingComments`
+error.
+
 ## Prerequisites on this machine
 
 - Rust via rustup, kept current with `rustup update stable` (the resource
