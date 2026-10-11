@@ -2,17 +2,21 @@ import { SourceControlProviderKind } from "@t3tools/contracts";
 // @effect-diagnostics nodeBuiltinImport:off - realpathSync.native resolves Windows 8.3 short names, which the Effect realPath does not.
 import * as NodeFS from "node:fs";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { SourceControlProviderError } from "@t3tools/contracts";
+import { type RepositoryIdentity, SourceControlProviderError } from "@t3tools/contracts";
 import { expect, it } from "@effect/vitest";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Ref from "effect/Ref";
 import * as Path from "effect/Path";
+import * as KeyValueStore from "effect/persistence/KeyValueStore";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import { TestClock } from "effect/testing";
 
 import * as ProcessRunner from "../processRunner.ts";
+import * as RepositoryIdentityMemory from "./RepositoryIdentityMemory.ts";
 import * as RepositoryIdentityResolver from "./RepositoryIdentityResolver.ts";
 
 const normalizePathSeparators = (value: string) => value.replaceAll("\\", "/");
@@ -455,3 +459,83 @@ it.layer(NodeServices.layer)("RepositoryIdentityResolverLive", (it) => {
     ),
   );
 });
+
+const rememberedIdentity = (workspaceRoot: string): RepositoryIdentity => ({
+  canonicalKey: "example.test/owner/repo",
+  locator: {
+    source: "git-remote",
+    remoteName: "origin",
+    remoteUrl: "git@example.test:owner/repo.git",
+  },
+  rootPath: workspaceRoot,
+  displayName: "owner/repo",
+});
+
+it.effect("withMemory keeps the last identity for a root whose folder is gone", () => {
+  const workspaceRoot = "/repo/feature";
+  const gitAnswers = Ref.makeUnsafe<RepositoryIdentity | null>(rememberedIdentity(workspaceRoot));
+  const folderExists = Ref.makeUnsafe(true);
+  const inner: RepositoryIdentityResolver.RepositoryIdentityResolver["Service"] = {
+    resolve: () => Ref.get(gitAnswers),
+  };
+  return Effect.gen(function* () {
+    const resolver = yield* RepositoryIdentityResolver.withMemory(inner);
+    expect(yield* resolver.resolve(workspaceRoot)).toEqual(rememberedIdentity(workspaceRoot));
+
+    // The worktree is removed: git finds nothing in the missing folder, memory answers.
+    yield* Ref.set(gitAnswers, null);
+    yield* Ref.set(folderExists, false);
+    expect(yield* resolver.resolve(workspaceRoot)).toEqual(rememberedIdentity(workspaceRoot));
+
+    // The folder is back without a repository: that null is real.
+    yield* Ref.set(folderExists, true);
+    expect(yield* resolver.resolve(workspaceRoot)).toBeNull();
+
+    // A root that never resolved has nothing to fall back on.
+    yield* Ref.set(folderExists, false);
+    expect(yield* resolver.resolve("/repo/never-seen")).toBeNull();
+  }).pipe(
+    Effect.provide(
+      Layer.merge(
+        RepositoryIdentityMemory.layerInMemory,
+        FileSystem.layerNoop({ exists: () => Ref.get(folderExists) }),
+      ),
+    ),
+  );
+});
+
+it.effect("the key-value memory survives a new store handle and skips unchanged writes", () =>
+  Effect.gen(function* () {
+    const backing = yield* KeyValueStore.KeyValueStore;
+    const memory = yield* RepositoryIdentityMemory.makeFromKeyValueStore;
+    const workspaceRoot = "/home/user/git/repo/feature";
+
+    expect(Option.isNone(yield* memory.recall(workspaceRoot))).toBe(true);
+    yield* memory.remember(workspaceRoot, rememberedIdentity(workspaceRoot));
+    expect(Option.getOrNull(yield* memory.recall(workspaceRoot))).toEqual(
+      rememberedIdentity(workspaceRoot),
+    );
+
+    // Same identity again leaves the stored value untouched; a changed one replaces it.
+    const writes: Array<string> = [];
+    const counting = yield* RepositoryIdentityMemory.makeFromKeyValueStore.pipe(
+      Effect.provideService(KeyValueStore.KeyValueStore, {
+        ...backing,
+        set: (key, value) => {
+          writes.push(key);
+          return backing.set(key, value);
+        },
+      }),
+    );
+    yield* counting.remember(workspaceRoot, rememberedIdentity(workspaceRoot));
+    expect(writes).toHaveLength(0);
+    yield* counting.remember(workspaceRoot, {
+      ...rememberedIdentity(workspaceRoot),
+      canonicalKey: "example.test/owner/renamed",
+    });
+    expect(writes).toHaveLength(1);
+    expect(Option.getOrNull(yield* memory.recall(workspaceRoot))?.canonicalKey).toBe(
+      "example.test/owner/renamed",
+    );
+  }).pipe(Effect.provide(Layer.merge(KeyValueStore.layerMemory, NodeServices.layer))),
+);

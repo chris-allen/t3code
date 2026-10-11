@@ -8,9 +8,13 @@ import * as Context from "effect/Context";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 
 import * as ProcessRunner from "../processRunner.ts";
+
+import * as RepositoryIdentityMemory from "./RepositoryIdentityMemory.ts";
 
 const DEFAULT_REPOSITORY_IDENTITY_CACHE_CAPACITY = 512;
 // Background sweeps resolve every project each minute. A long TTL keeps them
@@ -228,6 +232,34 @@ export const make = Effect.fn("RepositoryIdentityResolver.make")(function* (
     },
   );
 
+  return RepositoryIdentityResolver.of({ resolve });
+});
+
+/**
+ * Decorates a resolver with RepositoryIdentityMemory. Git has nothing to read in a deleted
+ * folder, so a removed worktree would resolve to no repository and fall out of its group. The
+ * identity the root last resolved to still names the repository, so that is the answer while the
+ * folder is gone. A folder that exists and resolves to null really has no repository, and memory
+ * stays out of it; so does one whose existence check fails, since an unreadable folder is not a
+ * deleted one.
+ */
+export const withMemory = Effect.fn("RepositoryIdentityResolver.withMemory")(function* (
+  resolver: RepositoryIdentityResolver["Service"],
+) {
+  const memory = yield* RepositoryIdentityMemory.RepositoryIdentityMemory;
+  const fileSystem = yield* FileSystem.FileSystem;
+  const resolve: RepositoryIdentityResolver["Service"]["resolve"] = Effect.fnUntraced(
+    function* (cwd, options) {
+      const identity = yield* resolver.resolve(cwd, options);
+      if (identity !== null) {
+        yield* memory.remember(cwd, identity);
+        return identity;
+      }
+      const exists = yield* fileSystem.exists(cwd).pipe(Effect.orElseSucceed(() => true));
+      if (exists) return null;
+      return Option.getOrNull(yield* memory.recall(cwd));
+    },
+  );
   return RepositoryIdentityResolver.of({ resolve });
 });
 
