@@ -142,6 +142,20 @@ export function buildSidebarProjectSnapshots(input: {
           member.environmentId === group.representative.environmentId &&
           member.id === group.representative.id,
       ) ?? members[0]!;
+    // The icon is chosen once per repository but stored per project, so a
+    // checkout added after the choice (a new worktree) has none. Members
+    // without their own override borrow the group's so every row renders
+    // the same badge the project filter shows.
+    const projectIcon =
+      representative.projectIcon ??
+      members.find((member) => member.projectIcon != null)?.projectIcon ??
+      null;
+    const membersWithIcon =
+      projectIcon === null
+        ? members
+        : members.map((member) =>
+            member.projectIcon != null ? member : { ...member, projectIcon },
+          );
 
     const hasLocal =
       input.primaryEnvironmentId !== null &&
@@ -167,6 +181,7 @@ export function buildSidebarProjectSnapshots(input: {
 
     return {
       ...representative,
+      projectIcon,
       projectKey: group.key,
       displayName: group.label,
       groupedProjectCount: members.length,
@@ -174,7 +189,7 @@ export function buildSidebarProjectSnapshots(input: {
         hasLocal && hasRemote ? "mixed" : hasRemote ? "remote-only" : "local-only",
       allRemoteMembersAreDesktopLocal,
       allRemoteMembersAreWsl,
-      memberProjects: members,
+      memberProjects: membersWithIcon,
       memberProjectRefs: group.memberProjectRefs,
       remoteEnvironmentLabels,
     };

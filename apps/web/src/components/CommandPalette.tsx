@@ -1049,10 +1049,19 @@ function OpenCommandPaletteDialog(props: {
       new Map<ProjectId, string>(projects.map((project) => [project.id, project.workspaceRoot])),
     [projects],
   );
-  const projectByKey = useMemo(
-    () => new Map(projects.map((project) => [`${project.environmentId}:${project.id}`, project])),
-    [projects],
-  );
+  // Group members overlay the raw records so thread rows carry their
+  // repository's icon, matching the sidebar.
+  const projectByKey = useMemo(() => {
+    const byKey = new Map(
+      projects.map((project) => [`${project.environmentId}:${project.id}`, project] as const),
+    );
+    for (const group of projectGroups) {
+      for (const member of group.memberProjects) {
+        byKey.set(`${member.environmentId}:${member.id}`, member);
+      }
+    }
+    return byKey as ReadonlyMap<string, Project>;
+  }, [projectGroups, projects]);
   const projectTitleById = useMemo(
     () => new Map<ProjectId, string>(projects.map((project) => [project.id, project.title])),
     [projects],
