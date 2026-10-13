@@ -225,7 +225,10 @@ import { stackedThreadToast, toastManager } from "./ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 import { ComposerHandleContext, useComposerHandleContext } from "../composerHandleContext";
 import type { ChatComposerHandle } from "./chat/ChatComposer";
-import { buildSidebarProjectPickerEntries } from "../sidebarProjectGrouping";
+import {
+  buildSidebarProjectPickerEntries,
+  withGroupMemberProjects,
+} from "../sidebarProjectGrouping";
 import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
 import { readPullRequestListPreferences } from "~/components/pullRequest/pullRequestListPreferences";
 import { useThreadRouteTarget } from "../hooks/useThreadRouteTarget";
@@ -618,7 +621,8 @@ function OpenCommandPaletteDialog(props: {
     return ensureBrowseDirectoryPath(baseDirectory);
   };
 
-  const { projectCwdById, projectByKey, projectTitleById } = useProjectLookups();
+  const { projectCwdById, projectByKey: rawProjectByKey, projectTitleById } = useProjectLookups();
+  const projectByKey = withGroupMemberProjects(rawProjectByKey, projectGroups);
 
   const activeThreadKey = activeThread
     ? scopedThreadKey(scopeThreadRef(activeThread.environmentId, activeThread.id))
