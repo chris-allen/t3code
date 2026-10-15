@@ -2,7 +2,7 @@ import { EnvironmentId, ProjectId } from "@t3tools/contracts";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import { describe, expect, it } from "vite-plus/test";
 
-import { buildSidebarProjectSnapshots } from "./sidebarProjectGrouping";
+import { buildProjectBadgeMap, buildSidebarProjectSnapshots } from "./sidebarProjectGrouping";
 
 const environmentId = EnvironmentId.make("environment");
 const repositoryIdentity = {
@@ -78,5 +78,31 @@ describe("buildSidebarProjectSnapshots project icons", () => {
 
     expect(group?.projectIcon).toBeNull();
     expect(group?.memberProjects.every((member) => member.projectIcon === undefined)).toBe(true);
+  });
+});
+
+describe("buildProjectBadgeMap", () => {
+  it("derives every member's monogram from the representative when nobody chose an icon", () => {
+    const badges = buildProjectBadgeMap(
+      snapshots([makeProject("repo", "/work/repo"), makeProject("repo-fix", "/work/repo-fix")]),
+    );
+
+    const badge = badges.get(`${environmentId}:repo-fix`);
+    expect(badge?.title).toBe("repo");
+    expect(badge?.workspaceRoot).toBe("/work/repo-fix");
+    expect(badge?.id).toBe(ProjectId.make("repo-fix"));
+  });
+
+  it("keeps a member's own title once it carries an icon", () => {
+    const badges = buildProjectBadgeMap(
+      snapshots([
+        makeProject("repo", "/work/repo", { projectIcon: icon }),
+        makeProject("repo-fix", "/work/repo-fix"),
+      ]),
+    );
+
+    const badge = badges.get(`${environmentId}:repo-fix`);
+    expect(badge?.projectIcon).toEqual(icon);
+    expect(badge?.title).toBe("repo-fix");
   });
 });
