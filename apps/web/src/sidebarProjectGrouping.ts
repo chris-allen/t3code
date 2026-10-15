@@ -31,6 +31,28 @@ export interface SidebarProjectSnapshot extends Project {
   remoteEnvironmentLabels: readonly string[];
 }
 
+/**
+ * The record a thread row hands ProjectFavicon so every checkout in a group wears
+ * the badge its project filter shows. Members inherit the group's chosen icon in
+ * `buildSidebarProjectSnapshots`; when nobody chose one, the monogram derives from
+ * the representative's title instead of each checkout's own name. Everything else
+ * (cwd, ids) stays the member's own.
+ */
+export function buildProjectBadgeMap(
+  groups: ReadonlyArray<SidebarProjectSnapshot>,
+): Map<string, SidebarProjectGroupMember> {
+  const badges = new Map<string, SidebarProjectGroupMember>();
+  for (const group of groups) {
+    for (const member of group.memberProjects) {
+      badges.set(
+        `${member.environmentId}:${member.id}`,
+        member.projectIcon != null ? member : { ...member, title: group.title },
+      );
+    }
+  }
+  return badges;
+}
+
 export function projectGroupsSpanEnvironments(
   groups: ReadonlyArray<Pick<SidebarProjectSnapshot, "memberProjects">>,
 ): boolean {

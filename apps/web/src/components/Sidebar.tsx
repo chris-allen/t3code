@@ -131,6 +131,7 @@ import { readLocalApi } from "../localApi";
 import { useSidebarPendingFileDropStore } from "../sidebarPendingFileDropStore";
 import { selectProjectGroupingSettings } from "../logicalProject";
 import {
+  buildProjectBadgeMap,
   projectGroupsSpanEnvironments,
   resolveSidebarProjectScopeKey,
   getSidebarProjectSettingsKey,
@@ -2569,15 +2570,13 @@ export default function Sidebar() {
   );
   // Rows read the project record for its icon and cwd. Group labels can include
   // a repository owner or a different title, so they travel separately. Group
-  // members overlay the raw records so a row carries its repository's icon.
+  // badges overlay the raw records so a row wears its repository's icon.
   const projectByKey = useMemo(() => {
-    const byKey = new Map(
+    const byKey = new Map<string, EnvironmentProject>(
       projects.map((project) => [`${project.environmentId}:${project.id}`, project] as const),
     );
-    for (const group of projectGroups) {
-      for (const member of group.memberProjects) {
-        byKey.set(`${member.environmentId}:${member.id}`, member);
-      }
+    for (const [key, badge] of buildProjectBadgeMap(projectGroups)) {
+      byKey.set(key, badge);
     }
     return byKey as ReadonlyMap<string, EnvironmentProject>;
   }, [projectGroups, projects]);

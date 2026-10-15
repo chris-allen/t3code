@@ -241,6 +241,7 @@ import { getProjectOrderKey, selectProjectGroupingSettings } from "../logicalPro
 import { legacyProjectCwdPreferenceKey, useUiStateStore } from "../uiStateStore";
 import {
   buildSidebarProjectPickerEntries,
+  buildProjectBadgeMap,
   buildSidebarProjectSnapshots,
 } from "../sidebarProjectGrouping";
 import type { Project } from "../types";
@@ -1049,16 +1050,14 @@ function OpenCommandPaletteDialog(props: {
       new Map<ProjectId, string>(projects.map((project) => [project.id, project.workspaceRoot])),
     [projects],
   );
-  // Group members overlay the raw records so thread rows carry their
+  // Group badges overlay the raw records so thread rows wear their
   // repository's icon, matching the sidebar.
   const projectByKey = useMemo(() => {
-    const byKey = new Map(
+    const byKey = new Map<string, Project>(
       projects.map((project) => [`${project.environmentId}:${project.id}`, project] as const),
     );
-    for (const group of projectGroups) {
-      for (const member of group.memberProjects) {
-        byKey.set(`${member.environmentId}:${member.id}`, member);
-      }
+    for (const [key, badge] of buildProjectBadgeMap(projectGroups)) {
+      byKey.set(key, badge);
     }
     return byKey as ReadonlyMap<string, Project>;
   }, [projectGroups, projects]);

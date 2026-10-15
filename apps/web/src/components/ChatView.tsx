@@ -370,6 +370,7 @@ import {
   deriveLogicalProjectKeyFromSettings,
   selectProjectGroupingSettings,
 } from "../logicalProject";
+import { buildProjectBadgeMap, buildSidebarProjectSnapshots } from "../sidebarProjectGrouping";
 import { buildDraftThreadRouteParams, buildThreadRouteParams } from "../threadRoutes";
 import {
   isSameSidebarThreadRef,
@@ -2922,6 +2923,20 @@ export default function ChatView(props: ChatViewProps) {
   // Auto balance retargets to an existing project; a machine's "No project"
   // folder may not exist until it is picked.
   const canAutoBalanceEnvironments = hasMultipleEnvironments && !activeProjectIsScratch;
+  // The header badge is the group's badge, the way sidebar rows render it.
+  const activeProjectBadge = useMemo(() => {
+    if (!activeProject) return null;
+    const groups = buildSidebarProjectSnapshots({
+      projects: allProjects,
+      settings: projectGroupingSettings,
+      primaryEnvironmentId,
+      resolveEnvironmentLabel: () => null,
+    });
+    return (
+      buildProjectBadgeMap(groups).get(`${activeProject.environmentId}:${activeProject.id}`) ??
+      activeProject
+    );
+  }, [activeProject, allProjects, primaryEnvironmentId, projectGroupingSettings]);
   const activeEnvironmentOption =
     logicalProjectEnvironments.find(
       (environment) => environment.environmentId === activeThread?.environmentId,
@@ -11181,6 +11196,7 @@ export default function ChatView(props: ChatViewProps) {
             isServerThread={isServerThread}
             activeThreadTitle={activeThread.title}
             activeProject={activeProject ?? null}
+            activeProjectBadge={activeProjectBadge}
             parentThreadLink={parentThreadLink}
             onOpenThread={onOpenRelatedThreadStable}
             rightPanelOpen={inlineRightPanelOwnsTitleBar}
