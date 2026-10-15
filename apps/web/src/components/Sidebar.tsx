@@ -113,7 +113,7 @@ import {
   resolveSidebarProjectScopeKeys,
   getSidebarProjectSettingsKey,
   type SidebarProjectSnapshot,
-  withGroupMemberProjects,
+  withProjectBadges,
 } from "../sidebarProjectGrouping";
 import { resolveProjectExpanded, useUiStateStore } from "../uiStateStore";
 import {
@@ -829,7 +829,7 @@ function useSidebarLookups() {
   const environmentLabelById = new Map(
     environments.map((environment) => [environment.environmentId, environment.label] as const),
   );
-  const projectByKey = withGroupMemberProjects(
+  const projectByKey = withProjectBadges(
     new Map(
       projects.map((project) => [`${project.environmentId}:${project.id}`, project] as const),
     ),

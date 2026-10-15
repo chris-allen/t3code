@@ -255,10 +255,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 import { ComposerHandleContext, useComposerHandleContext } from "../composerHandleContext";
 import type { ChatComposerHandle } from "./chat/ChatComposer";
 import { pickableProjectGroups } from "@t3tools/client-runtime/state/project-grouping";
-import {
-  buildSidebarProjectPickerEntries,
-  withGroupMemberProjects,
-} from "../sidebarProjectGrouping";
+import { buildSidebarProjectPickerEntries, withProjectBadges } from "../sidebarProjectGrouping";
 import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
 import { readPullRequestListPreferences } from "~/components/pullRequest/pullRequestListPreferences";
 import { useThreadRouteTarget } from "../hooks/useThreadRouteTarget";
@@ -658,7 +655,7 @@ function OpenCommandPaletteDialog(props: {
   };
 
   const { projectByKey: rawProjectByKey } = useProjectLookups();
-  const projectByKey = withGroupMemberProjects(rawProjectByKey, projectGroups);
+  const projectByKey = withProjectBadges(rawProjectByKey, projectGroups);
 
   const activeThreadKey = activeThread
     ? scopedThreadKey(scopeThreadRef(activeThread.environmentId, activeThread.id))

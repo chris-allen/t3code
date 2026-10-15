@@ -28,6 +28,22 @@ export interface SidebarProjectSnapshot extends Project {
   archived: boolean;
 }
 
+// Checkouts without a chosen icon wear the monogram of the group title, not their own name.
+export function buildProjectBadgeMap(
+  groups: ReadonlyArray<SidebarProjectSnapshot>,
+): Map<string, SidebarProjectGroupMember> {
+  const badges = new Map<string, SidebarProjectGroupMember>();
+  for (const group of groups) {
+    for (const member of group.memberProjects) {
+      badges.set(
+        `${member.environmentId}:${member.id}`,
+        member.projectIcon != null ? member : { ...member, title: group.title },
+      );
+    }
+  }
+  return badges;
+}
+
 export function projectGroupsSpanEnvironments(
   groups: ReadonlyArray<Pick<SidebarProjectSnapshot, "memberProjects">>,
 ): boolean {
@@ -41,17 +57,12 @@ export function projectGroupsSpanEnvironments(
   return false;
 }
 
-// Members carry the group's icon, so rows read them instead of the raw records.
-export function withGroupMemberProjects(
-  projectByKey: ReadonlyMap<string, Project>,
-  groups: ReadonlyArray<Pick<SidebarProjectSnapshot, "memberProjects">>,
-): ReadonlyMap<string, Project> {
-  const byKey = new Map(projectByKey);
-  for (const group of groups) {
-    for (const member of group.memberProjects) {
-      byKey.set(`${member.environmentId}:${member.id}`, member);
-    }
-  }
+export function withProjectBadges<T extends Project>(
+  projectByKey: ReadonlyMap<string, T>,
+  groups: ReadonlyArray<SidebarProjectSnapshot>,
+): ReadonlyMap<string, T | SidebarProjectGroupMember> {
+  const byKey = new Map<string, T | SidebarProjectGroupMember>(projectByKey);
+  for (const [key, badge] of buildProjectBadgeMap(groups)) byKey.set(key, badge);
   return byKey;
 }
 

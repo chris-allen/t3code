@@ -32,6 +32,7 @@ function header(title: string) {
         activeThreadTitle={title}
         isServerThread
         activeProject={null}
+        activeProjectBadge={null}
         parentThreadLink={null}
         onOpenThread={() => {}}
         rightPanelOpen={false}
