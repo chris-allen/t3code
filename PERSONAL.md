@@ -7,7 +7,7 @@ upstream PRs. This file only exists on this branch.
 
 ## Commits on this branch
 
-Run `git log --oneline v0.0.45..personal/stable` for the live list. Each commit is
+Run `git log --oneline v0.1.0..personal/stable` for the live list. Each commit is
 one of:
 
 - **Upstreamable fix.** Also opened as a PR from a `fix/*` branch off `main`.
@@ -20,7 +20,7 @@ one of:
 ```sh
 cd ~/git/t3code/personal
 git fetch origin --tags
-git rebase --onto v0.0.46 v0.0.45 personal/stable
+git rebase --onto v0.1.1 v0.1.0 personal/stable
 ```
 
 Resolve conflicts commit by commit. If a commit is now empty because upstream
@@ -69,15 +69,16 @@ mkdir -p /tmp/node26 && curl -fsSL https://nodejs.org/dist/v26.8.2/node-v26.8.2-
 scp -r capella:.t3/runtime/versions/0.0.45/resource-monitor /tmp/resource-monitor
 vp run --filter t3 build
 PATH="/tmp/node26/bin:$PATH" node apps/server/scripts/cli.ts build-exe
-node scripts/build-cli-archive.ts --platform linux --arch x64 --version 0.0.44 \
+node scripts/build-cli-archive.ts --platform linux --arch x64 --version 0.0.45 \
   --output-dir release --resource-monitor-dir /tmp/resource-monitor
-scp release/t3-0.0.44-linux-x64.tar.gz capella:git/t3code/personal/release/
+scp release/t3-0.0.45-linux-x64.tar.gz capella:git/t3code/personal/release/
 ```
 
-The version in the archive name is the repo's `package.json` version, which
-trails the release tag by one because release CI bumps it. The executable
-reports the same number, and the service installer expects the runtime at the
-directory named after it.
+The version in the archive name is the version in `apps/server/package.json`,
+which trails the release tag because release CI bumps it (`0.0.45` for tag
+`v0.1.0`). The executable reports the same number, and the service installer
+expects the runtime at the directory named after it. That directory may already
+hold the stock stable runtime of the same number; replacing it is intended.
 
 On capella, unpack it there and let the CLI rewrite the unit. The install
 stops, reloads, and restarts the service itself, which interrupts running
@@ -85,17 +86,19 @@ turns and remote clients, so nothing needs stopping first.
 
 ```sh
 cd ~/.t3/runtime/versions
-rm -rf 0.0.44 && mkdir 0.0.44
-tar -xzf ~/git/t3code/personal/release/t3-0.0.44-linux-x64.tar.gz \
-  --strip-components=1 -C 0.0.44
-printf '0.0.44\n' > 0.0.44/.install-complete
-0.0.44/t3 service install --allow-downgrade
-ln -sfn ~/.t3/runtime/versions/0.0.44/t3 ~/.local/bin/t3
+rm -rf 0.0.45 && mkdir 0.0.45
+tar -xzf ~/git/t3code/personal/release/t3-0.0.45-linux-x64.tar.gz \
+  --strip-components=1 -C 0.0.45
+printf '0.0.45\n' > 0.0.45/.install-complete
+0.0.45/t3 service install --allow-downgrade
+ln -sfn ~/.t3/runtime/versions/0.0.45/t3 ~/.local/bin/t3
 ```
 
-`--allow-downgrade` is needed because `0.0.44` sorts below the installed stable
-`0.0.45`. Do not run `t3 update` on capella; it would replace this build with
-the stock stable one.
+`--allow-downgrade` lets the install proceed whenever the number does not sort
+above the currently installed one. When the installer reports the version is
+already installed, finish with `systemctl --user restart t3code.service`. Do
+not run `t3 update` on capella; it would replace this build with the stock
+stable one.
 
 Capella can also build the archive itself: its Node 26 covers every step, and
 `~/git/t3code/personal/release/build.sh` there runs the whole sequence with
