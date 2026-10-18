@@ -208,10 +208,22 @@ const EMPTY_THREAD_STATE: ThreadRightPanelState = {
   surfaces: [],
 };
 
+// Personal: the details card stays closed until the thread's toggle opens it.
 const DEFAULT_THREAD_PANEL_VISIBILITY: ThreadPanelVisibility = {
-  inlineOpen: true,
+  inlineOpen: false,
   popoverOpen: false,
 };
+
+const isDefaultThreadPanelVisibility = (visibility: ThreadPanelVisibility) =>
+  visibility.inlineOpen === DEFAULT_THREAD_PANEL_VISIBILITY.inlineOpen && !visibility.popoverOpen;
+
+const persistedThreadPanelVisibility = (
+  threadKey: string,
+  inlineOpen: unknown,
+): ReadonlyArray<[string, ThreadPanelVisibility]> =>
+  typeof inlineOpen === "boolean" && inlineOpen !== DEFAULT_THREAD_PANEL_VISIBILITY.inlineOpen
+    ? [[threadKey, { inlineOpen, popoverOpen: false }]]
+    : [];
 
 const singletonSurface = (
   kind: Exclude<RightPanelKind, "file" | "preview" | "terminal" | "pull-request">,
@@ -340,7 +352,7 @@ const updateThreadPanelVisibilityMap = (
 ): Record<string, ThreadPanelVisibility> => {
   const current = byThreadKey[threadKey] ?? DEFAULT_THREAD_PANEL_VISIBILITY;
   const next = updater(current);
-  if (next.inlineOpen && !next.popoverOpen) {
+  if (isDefaultThreadPanelVisibility(next)) {
     if (!(threadKey in byThreadKey)) return byThreadKey;
     const { [threadKey]: _removed, ...rest } = byThreadKey;
     return rest;
@@ -589,9 +601,7 @@ export function migratePersistedRightPanelState(persistedState: unknown): {
             persistedState.threadPanelVisibilityByThreadKey as Record<string, unknown>,
           ).flatMap(([threadKey, value]) => {
             if (!value || typeof value !== "object" || !("inlineOpen" in value)) return [];
-            return value.inlineOpen === false
-              ? [[threadKey, { inlineOpen: false, popoverOpen: false }]]
-              : [];
+            return persistedThreadPanelVisibility(threadKey, value.inlineOpen);
           }),
         )
       : {};
@@ -1068,7 +1078,7 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
         threadPanelVisibilityByThreadKey: Object.fromEntries(
           Object.entries(state.threadPanelVisibilityByThreadKey).flatMap(
             ([threadKey, visibility]) =>
-              visibility.inlineOpen ? [] : [[threadKey, { inlineOpen: false, popoverOpen: false }]],
+              persistedThreadPanelVisibility(threadKey, visibility.inlineOpen),
           ),
         ),
       }),
